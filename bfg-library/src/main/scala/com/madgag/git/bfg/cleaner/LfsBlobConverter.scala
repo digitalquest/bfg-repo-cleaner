@@ -21,7 +21,7 @@
 package com.madgag.git.bfg.cleaner
 
 import java.nio.charset.Charset
-import java.security.{DigestInputStream, MessageDigest}
+import java.security.{DigestOutputStream, DigestInputStream, MessageDigest}
 
 import com.google.common.io.ByteStreams
 import com.madgag.git._
@@ -100,14 +100,17 @@ class LfsBlobConverter(
 
   def buildLfsFileFrom(loader: ObjectLoader): Option[(String, Path)] = {
     val tmpFile = createTempFile()
+    println(s"${loader.getSize} going to $tmpFile")
 
     val digest = MessageDigest.getInstance("SHA-256")
 
-    // use objectloader.copyTo() instead?
+    // use loader.copyTo() instead?
+
     for {
-      inStream <- Resource.fromInputStream(new DigestInputStream(loader.openStream(), digest))
       outStream <- tmpFile.outputStream()
-    } ByteStreams.copy(inStream, outStream)
+    } loader.copyTo(new DigestOutputStream(outStream, digest))
+
+    println(s"${loader.getSize} copied to $tmpFile")
 
     val shaHex = encodeHexString(digest.digest())
 
@@ -118,6 +121,8 @@ class LfsBlobConverter(
     }
 
     Try(tmpFile.delete(force = true))
+
+    println(s"${loader.getSize} copied to $shaHex")
 
     for (_ <- ensureLfsFile.toOption) yield shaHex -> lfsPath
   }
